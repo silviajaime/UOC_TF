@@ -1,0 +1,514 @@
+---
+title: "Analisis univariable: analisis descriptivo y temporal y preprocesado"
+output: html_notebook
+---
+
+#Nota: Este codigo cubre los resultados de los apartado del trabajo 2.3. Analisis descriptivo y pre-procesado de datos
+
+```{r}
+#Cargamos los datos
+electricity_prices<-read.csv("~/Documents/UOC/TF/electricity_prices.csv", header=TRUE) #Sustituir por el directorio donde se encuentra el fichero csv con los datos
+```
+
+```{r}
+#Eliminamos las columnas inecesarias para este estudio (demanda residual - demres) creando un nuevo data frame
+ep<- electricity_prices[,-21]
+```
+
+```{r}
+#Resumen datos
+summary(ep)
+```
+Dado que los mercados diarios 3, 4, 5, 6 y 7 no comercializan electricidad para todas las franjas horarias, existen observaciones sin datos (NAs)
+Por otra parte, observamos que las variabes sol y hid tienen NA's, en este caso deberemos estudiar si se trata de un error de datos.
+
+```{r}
+#Creamos vectores con las variables a estudiar
+price_MD<-electricity_prices$MD
+price_MI1<-electricity_prices$MI1
+price_MI2<-electricity_prices$MI2
+price_MI3<-electricity_prices$MI3
+price_MI4<-electricity_prices$MI4
+price_MI5<-electricity_prices$MI5
+price_MI6<-electricity_prices$MI6
+price_MI7<-electricity_prices$MI7
+hour<-electricity_prices$Hour
+```
+#1. Analisis precios
+```{r}
+#Analisis univariable 
+#Distribucion estadistica precios
+#Creamos un data frame con los precios de los diferentes mercados
+prices<-data.frame(electricity_prices$MD, electricity_prices$MI1, electricity_prices$MI2, electricity_prices$MI3, electricity_prices$MI4, electricity_prices$MI5, electricity_prices$MI6, electricity_prices$MI7)
+names(prices)<-c("MD","MI1", "MI2", "MI3", "MI4", "MI5", "MI6", "MI7")
+summary(prices)
+```
+
+Observamos que el promedio de los precios en los diferentes mercados oscila aproximadamente entre los 44 - 48 euros. La variable con la media de precio mas elevada es el precio en el mercado interdiario 7. No obstante, la variable con precio maximo mas elevado es el precio del mercado diario. Finalmente, observamos que todas las observaciones tienen un minimo de 0.00 euros
+
+#1.1.Analisis univariable de la variable precio MD
+```{r}
+#Creamos un histograma para observar la distribucion
+hist(price_MD, main="Histograma precio MD")
+```
+La distribucion presenta una ligera desviacion hacia la izquierda (skewed to the left). Esto significa que la frequencia de observaciones en la cola de la izquierda (precios bajos) es mayor que en la derecha (precios altos). Por lo tanto, parece que la variable no cumple con las condiciones de normalidad.
+
+```{r}
+#Miramos la normalidad
+library(e1071)
+skewness(price_MD)
+kurtosis(price_MD)
+```
+La variable no presenta una distribucion normal, sino una distribucion asimetrica con mas frecuencia en precios bajos que altos, como demuestra el grado de skweness
+
+```{r}
+#Observamos la evolucion temporal del precio en el mercado diario
+plot(electricity_prices$Date, electricity_prices$MD, main="Evolucion precio MD 2014-2017")
+```
+
+
+Se puede observar cierta ciclicidad en la evolucion temporal, con algunos picos, los mas destacables al inicio de 2014 y al inicio de 2017. Asi mismo, se observa un declive en los precios a inicios de 2016.
+
+```{r}
+#Creamos un boxplot
+boxplot(price_MD, main="Boxplot precio MD", ylab="Euros MWh")
+```
+La mayoria de observaciones se situan entre 37.50 euros y 55.10 euros, con una media de 45.29 euros por MWh
+
+```{r}
+#Estudiamos los outliers con valores mas elevados
+prices_1<-data.frame(electricity_prices$Date, electricity_prices$Hour, electricity_prices$DayofWeek,electricity_prices$MD, electricity_prices$MI1, electricity_prices$MI2, electricity_prices$MI3, electricity_prices$MI4, electricity_prices$MI5, electricity_prices$MI6, electricity_prices$MI7, electricity_prices$dem)
+names(prices_1)<-c("Date", "Hour", "DayofWeek", "MD","MI1", "MI2", "MI3", "MI4", "MI5", "MI6", "MI7", "dem")
+prices_1[prices_1$MD>99,] #Seleccionamos las filas donde el precio del MD es superior a 99
+```
+Los valores corresponden a los meses de enero, febrero y marzo de 2014 - 2017 en horario entre las 19:00 de la tarde y las 23:00 de la noche. No obstante, podemos comprobar que el precio es menor en los mercados intradiarios.
+
+```{r}
+#Estudiamos los outliers con valores mas bajos
+price_MD1<-data.frame(electricity_prices$Date, electricity_prices$Hour, electricity_prices$DayofWeek,electricity_prices$MD)
+names(price_MD1)<-c("Date", "Hour", "DayofWeek", "MD")
+prices_MD0<-data.frame(price_MD1[price_MD1$MD==0,])
+table(prices_MD0$Hour)
+```
+```{r}
+#Estudiamos los outliers con valores mas bajos
+summary(prices_MD0$Date)
+```
+
+Observamos que la mayoria de casos se dan de madrugada (entre las 2 y las 7 de la ma??ana) y corresponden a los meses de enero, febrero y marzo de 2014.
+
+
+#1.2. Analisis de la variable precio MI_1
+```{r}
+#Creamos un histograma para observar la distribucion
+hist(price_MI1, main="Histograma precio MI1")
+```
+
+```{r}
+#Miramos la normalidad
+library(e1071)
+skewness(price_MI1)
+kurtosis(price_MI1)
+```
+De nuevo, la distribucion presenta una asimetria con mas frecuancia en precios bajos que altos. La distribucion es muy parecida a la del mercado diario.
+
+```{r}
+#Analisis temporal evolucion precios del mercado intradiario 1
+plot(electricity_prices$Date, price_MI1, type="l", xlab="fecha", ylab="precio MWh", main="Evolucion temporal precio MI1 2014-2017")
+```
+```{r}
+#Creamos un boxplot
+boxplot(price_MI1, main="Boxplot precio MI1", ylab = "Precio MWh")
+```
+```{r}
+#Estudiamos los outliers mas elevados
+prices_1[prices_1$MI1>100,]
+```
+
+Estos outliers corresponden a fechas de enero 2017
+
+#1.3. Analisis de la variable precio MI_2
+```{r}
+#Creamos un histograma para observar la distribucion
+hist_MI2<-hist(price_MI2, xlab="precio MWh", ylab="frecuencia",main="Histograma precio MI2")
+```
+```{r}
+#Miramos la normalidad
+library(e1071)
+skewness(price_MI2)
+kurtosis(price_MI2)
+```
+La distribucion sigue presentando una asimetria con mas frecuencia de observaciones en los precios bajos que altos.
+
+```{r}
+#Analisis temporal evolucion precios
+plot(electricity_prices$Date, electricity_prices$MI2, type="l", xlab="Fecha", ylab="Precio MI2", main="Evolucion temporal precio MI2 2014-2017")
+```
+```{r}
+#Creamos un boxplot
+boxplot(price_MI2, main="Boxplot precio MI2", ylab= "Precio MWh")
+```
+
+Las variables descriptivas son similares a las del mercado interdiario 1. La evolucion de la variable en el tiempo presenta el mismo tipo de tendencias que en los analisis anteriores.
+
+```{r}
+#Estudiamos los outliers mas extremos con precios elevados
+prices_1[prices_1$MI2>100,]
+```
+
+Los valores corresponden a obervaciones del 23 y 25 de enero de 2017 (como en el MI1)
+
+#1.3. Analisis univariable price_MI3
+```{r}
+#Creamos un histograma para observar la distribucion
+hist_MI3<-hist(price_MI3, xlab="Precio MWh", ylab="frecuencia", main="Histograma precio MI3")
+```
+```{r}
+#Analisis temporal evolucion precios
+plot(electricity_prices$Date, price_MI3, type="l", xlab="fecha", ylab="precio MI3", main="Evolucion temporal precio MI3 2014-2017")
+```
+```{r}
+#Creamos un boxplot
+boxplot(price_MI3, main="Boxplot precio MI3", ylab= "Precio MWh")
+```
+
+```{r}
+#Estudiamos los outliers mas extremos con precios elevados
+outl_MI3<-prices_1[prices_1$MI3>90,]
+out_MI3<-na.omit(outl_MI3)
+out_MI3
+```
+De nuevo, la distribucion es muy similar a los casos anteriores y las observaciones extremas con precios elevados se producen en enero de 2017 (como en el MI1 y MI2)
+
+#1.4. Analisis de la variable precio MI_4
+```{r}
+#Creamos un histograma para observar la distribucion
+hist_MI4<-hist(price_MI4, main="Histograma precio MI4", xlab="Precio MWh")
+```
+```{r}
+#Analisis temporal evolucion precios
+plot(electricity_prices$Date, electricity_prices$MI4, type="l", xlab="fecha", ylab="precio MI4", main="Evolucion temporal precio MI4 2014-2017")
+```
+```{r}
+#Creamos un boxplot
+boxplot(price_MI4, main="Boxplot precio MI4", ylab= "Precio MWh")
+```
+```{r}
+#Estudiamos los outliers mas extremos con precios elevados
+outl_MI4<-prices_1[prices_1$MI4>90,]
+out_MI4<-na.omit(outl_MI4)
+out_MI4
+```
+
+Como en los casos anteriores, los precios mas altos se producen en enero 2017 y la distribucion de la variable es asimetrica con mas frecuencia en precios bajos que altos.
+
+#1.5. Analisis de la variable precio MI_5
+```{r}
+#Creamos un histograma para observar la distribucion
+hist_MI5<-hist(price_MI5, xlab="precio MI5", ylab="frecuencia",main="Histograma precio MI5")
+```
+```{r}
+#Analisis temporal evolucion precios
+plot(electricity_prices$Date, electricity_prices$MI5, type="l", xlab="fecha", ylab="precio MI5", main="Evolucion temporal precio MI5 2014-2017")
+```
+```{r}
+#Creamos un boxplot
+boxplot(price_MI5, main="Boxplot precio MI5", ylab= "Precio MWh")
+```
+```{r}
+#Estudiamos los outliers mas extremos con precios elevados
+outl_MI5<-prices_1[prices_1$MI5>90,]
+out_MI5<-na.omit(outl_MI5)
+out_MI5
+```
+Los outliers con valores muy elevados se repiten en el mes de enero 2017.
+
+#1.6. Analisis de la variable precio MI_6
+```{r}
+#Creamos un histograma para observar la distribucion
+hist_MI6<-hist(price_MI6, main="Histograma precio MI6")
+```
+```{r}
+#Analisis temporal evolucion precios
+plot(electricity_prices$Date, electricity_prices$MI6, type="l", xlab="fecha", ylab="precio MI6", main="Evolucion temporal precio MI6 2014-2017")
+```
+```{r}
+#Creamos un boxplot
+boxplot(price_MI6, main="Boxplot precio MI6", ylab= "Precio MWh")
+```
+```{r}
+#Estudiamos los outliers mas extremos con precios elevados
+outl_MI6<-prices_1[prices_1$MI6>90,]
+out_MI6<-na.omit(outl_MI6)
+out_MI6
+```
+De nuevo, los outliers con valores elevados mas extremos se repiten en enero 2017.
+
+#1.7. An??alisis de la variable precio MI_7
+```{r}
+#Creamos un histograma para observar la distribucion
+hist_MI7<-hist(price_MI2, main="Histograma precio MI7")
+```
+La distribucion es muy similar a la del resto de mercados.
+
+```{r}
+#Analisis temporal evolucion precios
+plot(electricity_prices$Date, electricity_prices$MI7, type="l", xlab="fecha", ylab="precio MI7", main="Evolucion temporal precio MI7 2014-2017")
+```
+
+
+#1.8. Analisis distribucion conjunto de precios
+```{r}
+#Creamos un boxplot de todos los precios para comparar visualmente sus distribuciones
+boxplot(prices, main="Boxplot precios mercados")
+```
+Comparamos con un boxplot todas las distribuciones y observamos que son muy similares (la media de precios es muy similar, asi como los cuartiles y los valores extremos).
+
+#2. Correlaciones entre precios
+```{r}
+cor(prices, use="complete")
+```
+
+Observamos que existe una relacion muy fuerte entre el precio de los diferentes mercados. El coeficiente de correlacion entre los diferentes precios tiene valores cercanos al 1. La relacion es positiva, por lo tanto, los precios se mueven cojuntamente en la misma direccion y no a la inversa.
+
+
+#1.9. Analisis del precio medio de todos los mercados
+```{r}
+#Creamos una variable que recoja el precio medio de la electricidad con el promedio de los diferentes mercados y la nombramos PM
+electricity_prices$PM<-rowMeans(prices, na.rm=TRUE)
+electricity_prices$PM<-round(electricity_prices$PM, digits=2)
+PM<-electricity_prices$PM #Creamos un vector con los precios medios de electricidad
+```
+```{r}
+#Creamos un histograma para observar la distribucion
+hist(PM, xlab="Precio Medio (PM)", ylab="frecuencia", main="Precio Medio Electricidad")
+```
+La distribucion, como en la de los mercados individuales presenta una ligera asimetria y mas frecuencia en precios bajos.
+
+```{r}
+#Creamos boxplot para observar los valores mas relevantes
+boxplot(PM, main = "precio medio electricidad")
+```
+```{r}
+#Observamos la descripcion estadistica de la variable
+summary(PM)
+```
+La gran parte de precios oscilan entre 37.23 y 54.74 euros, con una media de 44.93. 
+
+```{r}
+#Detectamos valores extremos
+out_price<-boxplot.stats(PM)$out
+head(out_price)
+```
+Se detectan 1514 outliers. No consideramos necesario eliminar estas observaciones, dado que nos interesa tener informacion sobre valores extremos de precio.
+
+```{r}
+#Observamos la evolucion de la variable a lo largo del tiempo
+plot(electricity_prices$Date, electricity_prices$PM, main="Evolucion temporal precios electricidad", xlab="Fecha", ylab= "Precio Mwh")
+```
+#2. Analisis de la variable demanda
+
+```{r}
+#Creamos un histograma para observar la demanda
+hist_dm<-hist(ep$dem, main="Histograma demanda", xlab= "Demanda (KWh)", col="grey")
+```
+```{r}
+#Miramos la normalidad
+skewness(ep$dem)
+kurtosis(ep$dem)
+z_kurtosis<-kurtosis(ep$dem)/sqrt(24/32855)
+z_kurtosis
+```
+La distribucion no presenta skewness pero si kurtosis (baja concentracion de valores en la media, predominan outliers). El valor z-kurtosis es superior a -1.96, por lo tanto la distribucion no es normal.
+
+```{r}
+#Creamos un boxplot de la demanda
+boxplot_dem<-boxplot(electricity_prices$dem, xlab="demanda electricidad", main="Boxplot demanda")
+boxplot_dem
+```
+
+No se observan distribuciones muy extremas (outliers).
+
+```{r}
+#Observamos la descripcion estadistica de la variable
+summary(ep$dem)
+```
+La demanda media es de 28640 MWh
+
+```{r}
+#Creamos un histograma para observar la evolucion de la demanda
+plot(electricity_prices$Date, electricity_prices$dem, main="Evolucion temporal demanda 2014-2017")
+```
+La evolucion de la demanda es claramente ciclica.
+
+#3. Analisis univariable-distribucion de la produccion
+```{r}
+#Distribucion tipo producci??n
+produccion<-data.frame(electricity_prices$eol, electricity_prices$nuc, electricity_prices$tot, electricity_prices$hid, electricity_prices$cco, electricity_prices$sol)
+names(produccion)<-c("eolica", "nuclear", "total", "hidraulica", "cco", "solar")
+summary(produccion)
+```
+```{r}
+#Observamos los valores NA de produccion hidraulica (registros con missing data)
+hid.na<-electricity_prices[is.na(electricity_prices$hid),]
+hid.na
+```
+Probablemente debido a algun error informatico no tenemos informacion de produccion hidraulica el 11/08. Por lo tanto, se deberan descartar estas filas cuando se analice la produccion
+
+```{r}
+#Observamos los valores NA (registros con missing data) de produccion solar
+sol.na<-electricity_prices[is.na(electricity_prices$sol),]
+sol.na
+```
+Probablemente debido a un error informatico no tenemos informacion de produccion solar el 26/03. Por lo tanto, se debera descartar esta filas cuando se analice la produccion
+
+```{r}
+plot(electricity_prices$Date, electricity_prices$eol)
+```
+
+```{r}
+plot(electricity_prices$Date, electricity_prices$hid)
+```
+
+```{r}
+boxplot(electricity_prices$hid, main="Boxplot prod. hidraulica")
+```
+#Observamos que existen un par de outliers que estan distorsionando la distribucion. Comprobamos el efecto de eliminar estas observaciones:
+
+```{r}
+outliers<-boxplot.stats(electricity_prices$hid)$out
+outliers
+```
+```{r}
+#Observamos los datos de los outliers encontrados en la produccion hidraulica
+electricity_prices[electricity_prices$hid>54785,]
+```
+
+```{r}
+#Creamos objeto con outliers produccion hidraulica
+out_hid<-c(56684.3, 54785.1)
+out_hid
+```
+
+```{r}
+#Distribucion produccion solar
+boxplot(electricity_prices$sol, main="Boxplot prod. solar")
+```
+
+
+```{r}
+#Realizamos grafico con la evolucion temporal de la produccion solar
+plot(electricity_prices$Date, electricity_prices$sol, ylab= "MWh prod solar")
+```
+Se distinguen claramente los outliers en la parte superior del grafico 
+
+```{r}
+#Creamos objeto con outliers
+outliers2<-boxplot.stats(electricity_prices$sol)$out
+outliers2
+```
+```{r}
+#Observamos los datos de los outliers encontrados en produccion solar
+electricity_prices[electricity_prices$sol>22229,]
+```
+Comprobamos que se trata de los mismos outliers detectados para la produccion hidraulica. Ambos coinciden en observaciones realizadas a finales de marzo, tanto el a??o 2014 como el 2015 a las 3 de la madrugada
+
+```{r}
+boxplot(electricity_prices$nuc, main="Boxplot prod. nuclear")
+```
+```{r}
+#Creamos objeto con outliers produccion nuclear
+outliers3<-boxplot.stats(electricity_prices$nuc)$out
+head(outliers3)
+```
+```{r}
+#Observamos los datos de los outliers encontrados
+electricity_prices[electricity_prices$nuc<1000,]
+```
+De nuevo, los outliers que distorsionan con mas intensidad la distribucion coinciden con los detectados anteriormente
+```{r}
+#Distribucion produccion nuclear
+plot(electricity_prices$Date, electricity_prices$nuc, ylab="MWh prod nuclear")
+```
+Se distinguen claramente los outliers en la parte inferior del grafico 
+
+```{r}
+#Distribucion produccion ciclo combinado
+boxplot(electricity_prices$cco, ylab = "MWh CCO")
+```
+```{r}
+#Grafico evolucion produccion CCO temporal
+plot(electricity_prices$Date, electricity_prices$cco)
+```
+```{r}
+#Creamos objeto con outliers produccion cco
+outliers4<-boxplot.stats(electricity_prices$cco)$out
+head(outliers4)
+```
+```{r}
+#Observamos los datos de los outliers encontrados
+electricity_prices[electricity_prices$cco<15000,]
+```
+```{r}
+#Observamos los datos de los outliers encontrados con fecha 2014
+electricity_prices[electricity_prices$Date=="2014-03-30",]
+```
+Definitivamente existe un error en esta observacion. Los valores estan incorrectamente clasificados (por ejemplo, el valor de produccion con energia hidraulica esta incorrectamente clasificado bajo produccion cco)
+```{r}
+#Observamos los datos de los outliers encontrados con fecha 2015
+electricity_prices[electricity_prices$Date=="2015-03-29",]
+```
+De nuevo, el valor de las observaciones se encuentra mal clasificado
+
+#2.3.1 Eliminacion de outliers
+```{r}
+#Arreglamos el primer outlier:
+electricity_prices[2115,]$hid<- 14175.6
+electricity_prices[2115,]$nuc<- 7117.2
+electricity_prices[2115,]$tot<- 56684.3
+electricity_prices[2115,]$cco<- 22229.3
+electricity_prices[2115,]$sol<- 0.2
+```
+```{r}
+#Observamos los datos del outlier arreglado
+electricity_prices[electricity_prices$Date=="2014-03-30",]
+```
+
+```{r}
+#Arreglamos el segundo outlier:
+electricity_prices$hid<- ifelse(electricity_prices$hid==54785.1,14175.6,electricity_prices$hid)
+electricity_prices$nuc<- ifelse(electricity_prices$nuc==0.0,7117.2,electricity_prices$nuc)
+electricity_prices$tot<- ifelse(electricity_prices$tot==7117.2,54785.1,electricity_prices$tot)
+electricity_prices$cco<- ifelse(electricity_prices$cco==14175.6,22604.1,electricity_prices$cco)
+electricity_prices$sol<- ifelse(electricity_prices$sol==22604.1,148.4,electricity_prices$sol)
+```
+
+```{r}
+#Observamos los datos del outlier arreglado
+electricity_prices[electricity_prices$Date=="2015-03-29",]
+```
+#Volvemos a realizar el analisis temporal y descrptivo
+```{r}
+#Produccion solar
+plot(electricity_prices$Date, electricity_prices$sol, main= "Evolucion temporal produccion solar de electricidad")
+```
+```{r}
+#Distribucion produccion solar
+boxplot(electricity_prices$sol, main="Boxplot prod. solar")
+```
+```{r}
+#Distribucion produccion hidraulica de electricidad
+boxplot(electricity_prices$hid, main="Boxplot prod. hidraulica")
+```
+```{r}
+#Evolucion temporal produccion hidraulica
+plot(electricity_prices$Date, electricity_prices$hid)
+```
+```{r}
+#Evolucion temporal produccion nuclear
+plot(electricity_prices$Date, electricity_prices$nuc)
+```
+```{r}
+#Actualizamos variable ep
+ep<- electricity_prices[,-21]
+```
