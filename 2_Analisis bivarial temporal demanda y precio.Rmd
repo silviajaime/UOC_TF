@@ -1,0 +1,453 @@
+---
+title: "Relacion precio medio (PM) y demanda con variables temporales (hora, dia, ...)"
+output: html_notebook
+---
+
+#2. Analisis bivarial precio medio y demanda
+#Nota: este analisis cubre los apartados 2.4 y 2.5.
+
+```{r}
+#Nota: se utilizan las variables creadas en el fichero 1_Analisis univariable y preprocesado.Rmd
+
+#Analisis de correlaciones entre la variable PM (Average price), hora, mes y dia
+hour<-electricity_prices$Hour
+t2<-data.frame(PM, electricity_prices$Hour, electricity_prices$Month, electricity_prices$dem)
+names(t2)<-c("Precio Medio", "Hora", "Mes", "Demanda")
+round(cor(t2), 4)
+```
+
+La correlacion entre el precio y las variables temporales no es muy elevada (por lo tanto estas variables no ayudan a explicar una parte significativa de la varianza del precio). Observamos una correlacion positiva entre precio-hora y precio-mes y una correlacion negativa entre precio-dia semana. La demanda si que presenta una correlacion positiva considerable con "hora".
+
+Nota: las variables hora y mes son categoricas aunque se estan utilizando como numericas
+
+#2.1. Analisis bivarial Precio medio, demanda y hora
+#2.1.1 PM - Hora
+```{r}
+#Analisis distribucion por hora
+boxplot(PM~hour, main = "Distribucion precio de la electricidad por hora", xlab= "Hora", ylab= "Precio MWh")
+```
+
+```{r}
+#Observamos las diferencias en el precio medio por hora a partir de la media
+tapply(PM, hour, mean)
+```
+```{r}
+#Calculamos la desviacion estandar por hora
+tapply(PM, hour, sd)
+```
+```{r}
+#Calculamos los valores estadisticos de media y desviacion para realizar un grafico de mean y SD
+p_h<-data.frame(PM, hour)
+summarySE <- function(data=NULL, measurevar, groupvars=NULL, na.rm=FALSE,
+                      conf.interval=.95, .drop=TRUE) {
+    library(plyr)
+
+    # New version of length which can handle NA's: if na.rm==T, don't count them
+    length2 <- function (x, na.rm=FALSE) {
+        if (na.rm) sum(!is.na(x))
+        else       length(x)
+    }
+
+    # This does the summary. For each group's data frame, return a vector with
+    # N, mean, and sd
+    datac <- ddply(data, groupvars, .drop=.drop,
+      .fun = function(xx, col) {
+        c(N    = length2(xx[[col]], na.rm=na.rm),
+          mean = mean   (xx[[col]], na.rm=na.rm),
+          sd   = sd     (xx[[col]], na.rm=na.rm)
+        )
+      },
+      measurevar
+    )
+
+    # Rename the "mean" column    
+    datac <- rename(datac, c("mean" = measurevar))
+
+    datac$se <- datac$sd / sqrt(datac$N)  # Calculate standard error of the mean
+
+    # Confidence interval multiplier for standard error
+    # Calculate t-statistic for confidence interval: 
+    # e.g., if conf.interval is .95, use .975 (above/below), and use df=N-1
+    ciMult <- qt(conf.interval/2 + .5, datac$N-1)
+    datac$ci <- datac$se * ciMult
+
+    return(datac)
+}
+library(plyr)
+s_hora <- summarySE(p_h, measurevar="PM", groupvars=c("hour"))
+s_hora
+```
+```{r}
+#Creamos grafico de mean con standard deviation error bars
+library(ggplot2)
+pd <- position_dodge(0.1)
+ggplot(s_hora, aes(x=hour, y=PM)) + 
+    geom_errorbar(aes(ymin=PM-sd, ymax=PM+sd), colour="red", width=.3, position=pd) +
+    geom_line(position=pd, colour="blue") +
+    xlab("Hora") +
+    ylab("Precio Medio") +
+    geom_point(position=pd, size=1, shape=21, color="red", fill="red") +
+    geom_text(aes(label = round(PM, 1)), color="black", size=4.5)+
+    ggtitle("Mean y standard deviation bars hora y precio medio")
+       
+```
+Referencia: http://www.cookbook-r.com/Graphs/Plotting_means_and_error_bars_(ggplot2)/
+
+Observamos precios ligeramente mas altos entre las 8:00 y las 15:00 y en el intervalo de las 20:00 a las 22:00. En el intervalo de 20:00 a 22:00 los outliers son mas pronunciados.
+
+```{r}
+#Realizamos un grafico de medias por hora con intervalos de confianza mediante la funcion plotmeans
+plotmeans(PM~electricity_prices$Hour, digits=1, ccol="red", mean.labels=T,bars=T, xlab= "Hora",n.label=F, ylab= "Mean precio medio", main="Mean precio medio por hora") 
+```
+Aparece un error debido a que los intervalos de confianza son muy pequenos para el grafico.
+
+#2.1.2. Demanda - Hora
+```{r}
+#Analisis distribucion demanda por hora
+boxplot(electricity_prices$dem~hour)
+```
+```{r}
+#Analisis correlacion demanda - hora
+cor(electricity_prices$dem, electricity_prices$Hour)
+```
+La relacion entre la demanda y la hora es significativa con un valor superior al 50%.
+
+```{r}
+#Realizamos un grafico de medias de demanda por hora con intervalos de confianza mediante la funcion plotmeans
+plotmeans(electricity_prices$dem~electricity_prices$Hour, digits=1, ccol="red", mean.labels=T,bars=T, xlab= "Hora",n.label=F, ylab= "Demanda MWh", main="Mean demanda por hora") 
+```
+
+```{r}
+#Observamos las diferencias en el precio medio por hora a partir de la media
+tapply(ep$dem, hour, mean)
+```
+```{r}
+#Calculamos la desviacion estandar por hora
+tapply(ep$dem, hour, sd)
+```
+La demanda mas elevada se da entre las 11:00-15:00 y las 19:00-22:00. Por el contrario, la demanda mas baja es entre las 02:00 y as 07:00.La desviacion estandar es mas elevada entre las 08:00 y las 09:00.
+
+#2.1.3. Precio medio por parte del dia
+```{r}
+#Creamos dummy para diferenciar dia manana, tarde y noche (morning, afternoon y night) y comprobar si existen diferencias en los grupos.  
+Morning<-ifelse(electricity_prices$Hour>=7&electricity_prices$Hour<13,
+   1,
+   0)
+```
+```{r}
+Afternoon<-ifelse(electricity_prices$Hour>=13&electricity_prices$Hour<22,
+   1,
+   0)
+```
+```{r}
+Night<-ifelse(electricity_prices$Hour>=22|electricity_prices$Hour<7,
+   1,
+   0)
+```
+```{r}
+#Analisis correlacion morning - PM
+cor(PM,Morning)
+```
+
+```{r}
+#Analisis correlacion PM - tarde
+cor(PM,Afternoon)
+```
+
+```{r}
+#Correlacion entre PM - noche
+cor(PM,Night)
+```
+```{r}
+Part_day<-ifelse(Night==1, 
+                 "night", ifelse (Morning==1, 
+                 "morning", "afternoon"))
+Part_day<-factor(Part_day, c("morning", "afternoon", "night"))
+boxplot(PM~Part_day)
+```
+La correlacion mas alta es con la variable noche. Esta correlacion es negativa dado que el precio medio nocturno es ligeramente mas bajo. No obstante, el valor de correlacion es muy bajo (-0.1712)
+
+#2.2.Analisis bivarial precio y demanda con variable dia
+
+#2.2.1. PM - Dia semana
+```{r}
+#Creamos nueva columna (WeekDay) convirtiendo el formato numerico de los dias (del 1 al 7) en texto
+electricity_prices$WeekDay<-ifelse(electricity_prices$DayofWeek==1,
+   "Lunes", ifelse(
+   electricity_prices$DayofWeek==2,
+   "Martes",ifelse(
+   electricity_prices$DayofWeek==3,
+   "Miercoles",ifelse(
+   electricity_prices$DayofWeek==4,
+   "Jueves",ifelse(
+   electricity_prices$DayofWeek==5,
+   "Viernes",ifelse(
+   electricity_prices$DayofWeek==6,
+   "Sabado", "Domingo"))))))
+#Ordenamos dias
+electricity_prices$WeekDay<-factor(electricity_prices$WeekDay, c("Lunes", "Martes", "Miercoles", "Jueves","Viernes", "Sabado", "Domingo"))
+#Calculamos la media de precio por dia de la semana
+tapply(PM, electricity_prices$WeekDay, mean)
+```
+```{r}
+#desviacion estandar por dia de la semana
+tapply(PM, electricity_prices$DayofWeek, sd)
+```
+Observamos que el dia con media de precio mas alto es jueves y el dia con la media mas baja es domingo. Por otra parte, los dias con desviacion estandar mas alta son lunes y domingo (este dia el precio tiene mayor variabilidad respecto a la media). No obstante, en general las desviaciones son muy similares todos los dias de la semana. 
+
+```{r}
+#Boxplot PM por dias
+boxplot(PM~electricity_prices$WeekDay, main = "Distribucion precios por dia de la semana", ylab = "PM electricidad MWh")
+```
+#Podemos observar que el precio medio es mas bajo el fin de semana (sabado y domingo)
+
+```{r}
+#Creamos dummy para diferenciar dia de la semana de fin de semana. Esta variable toma el valor 1 si es un dia laborable y 0 si es fin de semana. 
+electricity_prices$Dialaborable<-ifelse(electricity_prices$DayofWeek==1,
+   1, ifelse(
+   electricity_prices$DayofWeek==2,
+   1,ifelse(
+   electricity_prices$DayofWeek==3,
+   1,ifelse(
+   electricity_prices$DayofWeek==4,
+   1,ifelse(
+   electricity_prices$DayofWeek==5,
+   1,
+   0)))))
+```
+
+```{r}
+#Observamos la correlacion de dia laborable con el precio
+cor(PM, electricity_prices$Dialaborable)
+```
+El valor de correlacion entre dia laborable y PM no es muy elevado (0.225). La correlacion que existe es positiva (lo que se puede interpretar como precios as altos en dias laborables)
+
+```{r}
+#Observamos la distribucion del precio por dia laborable (working day) y fin de semana (weekend)
+Part_week<-ifelse(electricity_prices$Dialaborable==1, 
+                 "working day", "weekend")
+Part_week<-factor(Part_week, c("working day", "weekend"))
+boxplot(PM~Part_week, main="Price per part of week", ylab="PM electricidad MWh")
+```
+
+#A diferencia de el primer estudio de correlaciones, ahora el valor es un poco mas alto y positivo. Lo que nos indica que el precio de la electricidad en dias laborables tiene cierta tendencia a ser mas elevado. En el boxplot observamos que el precio medio en dias laborables (valor del eje "1"") es ligeramente mayor. Aunque la varianza tambien es mayor.
+
+#2.2.1. Demanda - Dia semana
+```{r}
+#Boxplot PM por dias
+boxplot(ep$dem~electricity_prices$WeekDay, main = "Distribucion demanda por dia de la semana", ylab = "Demanda electricidad MWh")
+```
+Como en los precios, la demanda media es mas baja en fin de semana. El dia con mayor variabilidad es el lunes.
+```{r}
+#Observamos la correlacion de dia laborable con la demanda
+cor(ep$dem, electricity_prices$Dialaborable)
+```
+El valor de correlacion  no es muy elevado pero marca una cierta relacion positiva (si es dia laborable la demanda es mayor)
+
+#2.3. Analisis relacion precio y demanda por mes
+#2.3.1. Precio - Mes
+```{r}
+#Creamos columna en el dataframe con el nombre de los meses
+electricity_prices$Mes=electricity_prices$Month
+electricity_prices$Mes[electricity_prices$Mes=="1"]<-"enero"
+electricity_prices$Mes[electricity_prices$Mes=="2"]<-"febrero"
+electricity_prices$Mes[electricity_prices$Mes=="3"]<-"marzo"
+electricity_prices$Mes[electricity_prices$Mes=="4"]<-"abril"
+electricity_prices$Mes[electricity_prices$Mes=="5"]<-"mayo"
+electricity_prices$Mes[electricity_prices$Mes=="6"]<-"junio"
+electricity_prices$Mes[electricity_prices$Mes=="7"]<-"julio"
+electricity_prices$Mes[electricity_prices$Mes=="8"]<-"agosto"
+electricity_prices$Mes[electricity_prices$Mes=="9"]<-"setiembre"
+electricity_prices$Mes[electricity_prices$Mes=="10"]<-"octubre"
+electricity_prices$Mes[electricity_prices$Mes=="11"]<-"noviembre"
+electricity_prices$Mes[electricity_prices$Mes=="12"]<-"diciembre"
+```
+```{r}
+#Ordenamos los meses
+electricity_prices$Mes<-factor(electricity_prices$Mes, c("enero", "febrero", "marzo", "abril","mayo", "junio", "julio", "agosto", "setiembre", "octubre", "noviembre", "diciembre"))
+Mes<-electricity_prices$Mes
+#Creamos boxplot para ver la distribucion de los precios por mes
+boxplot(PM~electricity_prices$Mes, xlab="Mes", ylab="Precio Medio")
+```
+```{r}
+#Observamos los precios medios por mes
+tapply(PM, electricity_prices$Mes, mean)
+```
+```{r}
+#Observamos los precios medios por mes
+tapply(PM, electricity_prices$Mes, sd)
+```
+#Los resultados indican que los meses con media de precio mas elevado son setiembre, octubre, noviembre y diciembre. Por el contrario, los meses con precios medios mas bajos son febrero, marzo y abril. Respecto a la desviacion estandar, esta es mas pronunciada en enero y febrero (es decir, durante enero y febrero, los precios varian mas respecto a la media)
+
+```{r}
+#Calculamos medias y desviaciones por mes
+Month<-electricity_prices$Month
+p_m<-data.frame(PM, Month)
+summarySE <- function(data=NULL, measurevar, groupvars=NULL, na.rm=FALSE,
+                      conf.interval=.95, .drop=TRUE) {
+    library(plyr)
+
+    # New version of length which can handle NA's: if na.rm==T, don't count them
+    length2 <- function (x, na.rm=FALSE) {
+        if (na.rm) sum(!is.na(x))
+        else       length(x)
+    }
+
+    # This does the summary. For each group's data frame, return a vector with
+    # N, mean, and sd
+    datac <- ddply(data, groupvars, .drop=.drop,
+      .fun = function(xx, col) {
+        c(N    = length2(xx[[col]], na.rm=na.rm),
+          mean = mean   (xx[[col]], na.rm=na.rm),
+          sd   = sd     (xx[[col]], na.rm=na.rm)
+        )
+      },
+      measurevar
+    )
+
+    # Rename the "mean" column    
+    datac <- rename(datac, c("mean" = measurevar))
+
+    datac$se <- datac$sd / sqrt(datac$N)  # Calculate standard error of the mean
+
+    # Confidence interval multiplier for standard error
+    # Calculate t-statistic for confidence interval: 
+    # e.g., if conf.interval is .95, use .975 (above/below), and use df=N-1
+    ciMult <- qt(conf.interval/2 + .5, datac$N-1)
+    datac$ci <- datac$se * ciMult
+
+    return(datac)
+}
+library(plyr)
+
+library(ggplot2)
+s_month <- summarySE(p_m, measurevar="PM", groupvars=c("Month"))
+s_month
+```
+```{r}
+#Realizamos grafico con mean y sd
+pd <- position_dodge(0.1)
+ggplot(s_month, aes(x=Month, y=PM)) + 
+    geom_errorbar(aes(ymin=PM-sd, ymax=PM+sd), colour="red", width=.1, position=pd) +
+    geom_path(position=pd, color="blue") +
+    xlab("Mes") +
+    ylab("Precio Medio") +
+    geom_point(position=pd, size=1.5, shape=21,color="red") +
+    geom_text(aes(label = round(PM, 1)), color="black", size=3.5) + 
+    ggtitle("Mean y SD bars precio y mes")
+       
+```
+
+```{r}
+library(gplots)
+```
+
+```{r}
+#Realizamos un grafico con la media y los intervalos de confianza por mes y precio medio
+plotmeans(PM~Mes, digits=1, ccol="red", mean.labels=TRUE, bars=T, xlab= "Mes",n.label=F, ylab= "Mean precio medio", main="Mean precio medio por mes") 
+```
+```{r}
+#Realizamos test ANOVA para ver si existe una relacion de independencia entre el precio y los meses
+anova_mes = aov(PM ~ Mes, data= electricity_prices)
+summary(anova_mes)
+```
+```{r}
+#Obtenemos el valor critico de una distribucion Fisher con una probabilidad de 5%
+qf(0.05, 12-1, 32855-12, lower.tail = F)
+```
+Probabilidad de que la variable tome un valor por encima de 1.789 es del 5% (P[X>Valor Critico]=0,05). El valor F obtenido en el analisis ANOVA (755.7) es muy superior al valor critico 1.789, donde se encuentra el limite para 5%. Concluimos que debemos rechazar la hipotesis nula: las medias de los tres productos no son significativamente distintas.
+
+#2.3.2. Demanda - Mes
+
+```{r}
+#Observamos los precios medios por mes
+tapply(ep$dem, electricity_prices$Mes, mean)
+```
+La demanda es superior en los meses de enero, febrero y julio
+
+```{r}
+#Realizamos test ANOVA para ver si existe una relacion de independencia entre la demanda y los meses
+anova_dm = aov(dem ~ Mes, data= electricity_prices)
+summary(anova_dm)
+```
+```{r}
+#Obtenemos el valor critico de una distribucion Fisher con una probabilidad de 5%
+qf(0.05, 12-1, 32855-12, lower.tail = F)
+```
+Con un valor F muy superior al valor critico, rechazamos la hipotesis nula de que no hay diferencia significativa entre la media de los distintos meses
+
+```{r}
+plotmeans(electricity_prices$dem~Mes, digits=2, ccol="red", mean.labels=TRUE, bars=T, xlab= "Mes", ylab= "Mean demanda", p=0.95, main="Mean plot demanda por mes") 
+```
+Observamos que los valores mas bajos se producen en abril, mayo y octubre
+
+#2.4 Analisis precio por semana del mes
+```{r}
+#Analisis de correlaciones entre la variable precio MD, semana mes
+cor(PM, electricity_prices$WeekofMonth)
+```
+```{r}
+#Analisis precio medio por semana mes
+tapply(PM, electricity_prices$WeekofMonth, mean)
+```
+```{r}
+#Analisis precio medio por semana mes
+boxplot(PM~electricity_prices$WeekofMonth)
+```
+
+#No parece haber relacion entre la semana del mes y el precio de la electricidad
+
+#2.3. Analisis bivarial precio demanda
+```{r}
+#Correlacion precio y demanda
+round(cor(electricity_prices$dem, PM),4)
+```
+El precio y la demanda parecen mantener una relacion positiva
+
+```{r}
+#Analisis visual relacion precio demanda mediante scatter plot
+plot(electricity_prices$dem, PM, ylab = "PM electricidad MWh", xlab= "Demanda MWh")
+```
+```{r}
+#Realizamos regresion y comprobamos la normalidad
+price_dem.lm = lm(electricity_prices$PM ~ electricity_prices$dem  , data=electricity_prices) 
+price_dem.lm 
+price_dem.stdres = rstandard(price_dem.lm)
+qqnorm(price_dem.stdres, 
+       ylab="Standardized Residuals", 
+       xlab="Normal Scores", 
+       main="Precio - Demanda") 
+qqline(price_dem.stdres)
+```
+Con el estudio de los residuos podemos ver que la relacion no presenta normalidad
+
+```{r}
+summary(price_dem.lm)
+```
+El valor de R-squared es muy bajo, lo que demuestra la poca relacion lineal entre las variables.
+
+```{r}
+#A??adimos la linea de regresi??n al grafico
+plot(electricity_prices$dem, electricity_prices$PM, xlab = "Demanda MWh", ylab = "Precio medio euros MWh")
+abline(lm(electricity_prices$PM ~ electricity_prices$dem), col= "red")
+text(20500, 85, labels = "R_squared =  0.2", col = "red")
+```
+```{r}
+#Realizamos una transformacion en la variable demanda (elevamos al cuadrado)
+ep_dem<-electricity_prices[,c("PM", "dem")]
+ep_dem$dem_SQ<-electricity_prices$dem^2
+cor(ep_dem)
+```
+```{r}
+#Realizamos regresion con la funcion cuadratica
+PM2_dem.lm <- lm(electricity_prices$PM ~ electricity_prices$dem + I(electricity_prices$dem^2), data=electricity_prices) 
+summary(PM2_dem.lm)
+```
+Resultado: el valor R-squared ha aumentado un poco pero los coeficientes siguen sin ser significantes
+
+```{r}
+#A??adimos la linea de regresi??n al grafico
+plot(electricity_prices$dem, electricity_prices$PM, xlab = "demanda", ylab = "precio medio")
+curve(PM2_dem.lm$coefficient[1]+PM2_dem.lm$coefficient[2]*x+PM2_dem.lm$coefficient[3]*x^2,add=T,col="red")
+```
+
