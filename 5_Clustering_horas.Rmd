@@ -1,0 +1,308 @@
+---
+title: "5_Clustering precio electricidad, hora y demanda"
+output:
+  html_document: default
+  html_notebook: default
+---
+#Nota: Los resultados corresponden a el apartado del trabajo 2.6.2. K-means precio medio, hora y demanda
+
+# 5. Clustering precios electricidad, hora y demanda
+```{r}
+#Nota: se utilizan variables y data frames creados en el archivo 1_Analisis univariable y preprocesado por lo tanto se debe ejecutar primero este archivo
+
+#Creamos data frame seleccionando solo los datos objeto de estudio (hora, demanda y precio medio)
+clus_h<-electricity_prices[,c("Hour", "PM", "dem")]
+clus_h1<-clus_h
+```
+```{r}
+#Normalizamos las variables para evitar las bias producidas por las diferentes escalas (k-means se basa en distancias, por lo tanto debemos normalizar las variables)
+clus_h1[,c("Hour")]<-(clus_h$Hour-mean(clus_h$Hour))/sd(clus_h$Hour)
+clus_h1[,c("PM")]<-(clus_h$PM-mean(clus_h$PM))/sd(clus_h$PM)
+clus_h1[,c("dem")]<-(clus_h$dem-mean(clus_h$dem))/sd(clus_h$dem)
+```
+
+#5.1. Con semilla seed = 345 
+```{r}
+#Fijamos una semilla que marcara la aleatoriedad (345). Si se modifica los resultados podrian cambiar.
+#El objetivo con la eleccion de K es minimizar la dentro del grupo y maxmizar la entre grupos, representamos graficamente los resultados
+set.seed(345)
+bss_h<-kmeans(clus_h1, centers=1)$betweenss
+for(i in 2:10) bss_h[i] <-kmeans(clus_h1, centers=i)$betweenss
+plot(1:10, bss_h, type="l", xlab="Number groups", ylab="Sum squared between groups")
+```
+```{r}
+set.seed(345)
+bss_h1<-kmeans(clus_h1, centers=1)$tot.withinss
+for(i in 2:10) bss_h1[i] <-kmeans(clus_h1, centers=i)$tot.withinss
+plot(1:10, bss_h1, type="l", xlab="Number groups", ylab="Within groups sum of squares")
+```
+
+Parece que la solucion mas optima se encuentra entre 3 y 4 centros. A partir de 4 la mejora en sum squared between groups es insignificante.
+
+```{r}
+#Probamos la version de k-means con 3 centros
+set.seed(345)
+clush_k3<-kmeans(clus_h1, centers=3)
+clush_k3$centers
+```
+```{r}
+#Observamos la media con los valores sin estandarizar
+aggregate(clus_h, by=list(clush_k3$cluster), mean)
+```
+
+```{r}
+#Comprobamos la suma de cuadrados entre grupos
+clush_k3$betweenss
+```
+```{r}
+#Realizamos k-means con 4 centros
+set.seed(345)
+clush_k4<-kmeans(clus_h1, centers=4)
+clush_k4$centers
+```
+```{r}
+#Observamos la media con los valores sin estandarizar
+aggregate(clus_h, by=list(clush_k4$cluster), mean)
+```
+
+```{r}
+#Observamos la suma de cuadrados entre grupos 
+clush_k4$betweenss
+```
+
+La suma de cuadrados ha aumentado 9123.9 respecto a la solucion con 3 clusters
+
+Interpretacion clusters: 
+Cluster 1: manana, precio medio bajo
+Cluster 2: madrugada, precio medio intermedio
+Cluster 3: tarde, precio medio alto
+Cluster 4: noche, precio medio intermedio
+
+```{r}
+#Realizamos k-means con 5 centros
+set.seed(345)
+clush_k5<-kmeans(clus_h1, centers=5)
+clush_k5$centers
+```
+```{r}
+#Observamos la suma de cuadrados entre grupos 
+clush_k5$betweenss
+```
+La suma de cuadrados se in crementado en 4538.5 respecto la solucion anterior (aproximadamente la mitad que entre tres y 4 centros)
+
+```{r}
+#Comprobamos los resultados sin estandarizar
+aggregate(clus_h, by=list(clus1_k5$cluster), mean)
+```
+Interpretacion clusters: 
+Cluster 1: manana, precio medio bajo
+Cluster 2: madrugada, precio medio intermedio
+Cluster 3: noche, precio medio alto
+Cluster 4: tarde, precio medio bajo
+Cluster 5: mediodia, precio medio alto
+
+#Escogemos la solucion con 4 clusters y realizamos un analisis detallado de los diferentes clusters
+
+#5.1.2. Interpretacion k-means con k =4
+```{r}
+#Observamos cuantas observaciones caen en cada cluster
+clus_h$cluster<-clush_k4$cluster #A??adimos una columna en los datos con e numero de cluster
+table(clus_h$cluster)
+```
+
+
+```{r}
+boxplot(clus_h$Hour~clus_h$cluster, main="hour range per cluster", ylab= "Hora", xlab= "Clusters")
+```
+Como se ha comentado anteriormente:
+- Cluster 1: manana
+- Cluster 2: madrugada
+- Cluster 3: tarde
+- Cluster 4: noche (evening)
+```{r}
+boxplot(electricity_prices$PM~clus_h$cluster, main ="average price per cluster", xlab="PM", ylab= "Cluster")
+```
+```{r}
+boxplot(electricity_prices$Hour~clus1_k5$cluster, main="Hour distribution by cluster")
+```
+
+
+```{r}
+#Creamos una columna con las nuevas variables categoricas donde nombramos los clusters segun las partes del dia que predominan
+clus_hour<-clus_h
+clus_hour$DayPart1<-ifelse(clush_k4$cluster==1, "morning", 
+                                   ifelse(clush_k4$cluster==2, "night&early morning"
+                                          , ifelse(clush_k4$cluster==3, 
+                                                   "afternoon", 
+                                                          "evening")))
+```
+```{r}
+#Ordenamos los resultados
+clus_hour$DayPart1<-factor(clus_hour$DayPart1, c("morning","afternoon", "evening", "night&early morning"))
+```
+```{r}
+#Creamos tabla de frecuencia para ver cuantas observaciones caen en cada cluster
+table(clus_hour$DayPart1)
+```
+```{r}
+#Creamos boxplot para ver la distribucion segun horas
+boxplot(hour~clus_hour$DayPart1, main="rango horas por cluster", ylab= "Hora")
+```
+
+```{r}
+#Creamos boxplot para observar la distribucion por precio
+boxplot(PM~clus_hour$DayPart1, main ="Precio medio por parte del dia", ylab= "PM")
+```
+```{r}
+# Analizamos visualmente los resultados con un grafico de dispersion de demanda y precio, marcando los clusters con colores diferentes
+f_clus_h<-ggplot(electricity_prices, aes(x=dem, y=PM, col=clus_hour$DayPart1))+geom_point()
+f_clus_h
+```
+
+Conclusion: los precios mas altos se producen durante el mediodia (intervalo 10h-14h) y la tarde-noche. Los precios mas bajos se producen durante las primeras horas de la manana.
+
+#5.2. Con semilla Seed = 1234
+```{r}
+#Realizamos k-means cambiando la semilla a 1234. Primero observamos el decremento en suma de cuadrados dentro de los grupos
+set.seed(1234)
+bss_h2<-kmeans(clus_h1, centers=1)$tot.withinss
+for(i in 2:10) bss_h2[i] <-kmeans(clus_h1, centers=i)$tot.withinss
+plot(1:10, bss_h2, type="l", xlab="Number groups", ylab="Sum squared within groups")
+```
+La solucion optima sigue siendo de 4 centros
+
+```{r}
+#K-means con 4 centros
+set.seed(1234)
+clush1_k4<-kmeans(clus_h1, centers=4)
+clush1_k4$centers
+```
+```{r}
+#Observamos la media con los valores sin estandarizar
+aggregate(clus_h, by=list(clush1_k4$cluster), mean)
+```
+
+Interpretacion clusters:
+
+Cluster 1: mediodia-tarde, precio muy alto
+Cluster 2: noche, precio intermedio
+Cluster 3: manana, precio muy bajo
+Cluster 4: madrugada, precio intermedio
+
+
+Los resultados son identicos a los anteriores pero con el orden de los clusters cambiado
+
+```{r}
+#Creamos boxplot para ver la distribucion segun horas
+boxplot(hour~clush1_k4$cluster, main="rango horas por cluster", ylab= "Hora")
+```
+
+
+```{r}
+#Observamos la distribucion de los clusters segun precio y demanda
+library(ggplot2)
+f_clus_h1<-ggplot(electricity_prices, aes(x=dem, y=PM, col=clush1_k4$cluster))+geom_point()
+f_clus_h1
+```
+
+Estos resultados nos indican que, en este caso, modificar la semilla no influye en la distribucion de las observaciones en los grupos, elige las mismas soluciones.
+
+#5.3. Creacion de grupos de acuerdo con la solucion de k-means = 4
+```{r}
+#Creamos dummy para diferenciar manana, mediodia-tarde, noche y madrugada (morning, midday_afternoon, evening y night) y comprobar si existen diferencias en los grupos.  
+Morning<-ifelse(electricity_prices$Hour>=8&electricity_prices$Hour<12,
+   1,
+   0)
+```
+```{r}
+Midday_Afternoon<-ifelse(electricity_prices$Hour>=12&electricity_prices$Hour<19,
+   1,
+   0)
+```
+```{r}
+Evening<-ifelse(electricity_prices$Hour>=19&electricity_prices$Hour<24,
+   1,
+   0)
+```
+```{r}
+Night_early_morning<-ifelse(electricity_prices$Hour>=24|electricity_prices$Hour<8,
+   1,
+   0)
+```
+```{r}
+#Creamos data frame con precio, demanda y partes del dia
+clus1<-electricity_prices[,c("PM", "dem")]
+clus1$morning<-Morning
+clus1$midday_afternoon<-Midday_Afternoon
+clus1$evening<-Evening
+clus1$night_early_morning<-Night_early_morning
+```
+```{r}
+#Observamos las variables de data frame creado
+summary(clus1)
+```
+```{r}
+#Estandarizamos las varibles
+clus_1<-clus1 #Copiamos el objeto antes de modificarlo
+clus1[,c("PM")]<-(clus1$PM-mean(clus1$PM))/sd(clus1$PM)
+clus1[,c("dem")]<-(clus1$dem-mean(clus1$dem))/sd(clus1$dem)
+clus1[,c("morning")]<-(clus1$morning-mean(clus1$morning))/sd(clus1$morning)
+clus1[,c("midday_afternoon")]<-(clus1$midday_afternoon-mean(clus1$midday_afternoon))/sd(clus1$midday_afternoon)
+clus1[,c("evening")]<-(clus1$evening-mean(clus1$evening))/sd(clus1$evening)
+clus1[,c("night_early_morning")]<-(clus1$night_early_morning-mean(clus1$night_early_morning))/sd(clus1$night_early_morning)
+```
+```{r}
+#Buscamos numero optimo de clusters
+set.seed(123)
+bss1<-kmeans(clus1, centers=1)$tot.withinss
+for(i in 2:10) bss1[i] <-kmeans(clus1, centers=i)$tot.withinss
+plot(1:10, bss1, type="l", xlab="Number groups", ylab="Sum squared bw groups")
+```
+El numero optimo de clusters es 4, a partir de 4, se produce un aumento y una posterior mejora insignificante.
+```{r}
+set.seed(123)
+clus1_k4<-kmeans(clus1, centers=4)
+clus1_k4$centers
+```
+```{r}
+aggregate(clus_1, by=list(clus1_k4$cluster), mean)
+```
+El modelo k-means nos clasifica cada parte del dia en un cluster diferente. Interpretacion clusters:
+- Cluster 1: mediodia-tarde, demanda alta, precio medio
+- Cluster 2: noche-madrugada, demanda baja, precio bajo
+- Cluster 3: tarde-noche, demanda muy alta, precio alto
+- Cluster 4: ma??ana, demanda malta, precio medio
+
+```{r}
+#Recuento numero de observaciones en cada cluster
+table(clus1_k4$cluster)
+```
+Cluster con mas observaciones: 2 (precio bajo, demanda baja)
+
+```{r}
+#Creamos variable categorica con parte dia
+part_day<-ifelse(clus_1$morning==1, "morning", 
+                 ifelse(clus_1$midday_afternoon==1, "md_afternoon",
+                        ifelse(clus_1$evening==1, "evening","night_e_m")))
+```
+```{r}
+#Ordenamos parte del dia
+part_day<-factor(part_day, c("morning", "md_afternoon", "evening", "night_e_m"))
+```
+
+```{r}
+#Observamos visualmente la distribucion por meses
+counts_pd <- table(clus1_k4$cluster, part_day)
+barplot(counts_pd, main="Frecuencia observaciones cluster por parte del dia", horiz=TRUE,
+  ylab="hora", col=c("blue", "green", "orange", "red"),
+ 	legend = rownames(counts_pd))
+```
+
+```{r}
+#Realizamos boxplot con precios
+boxplot(PM~part_day, ylab= "PM MWh")
+```
+```{r}
+#Realizamos boxplot con demanda
+boxplot(ep$dem~part_day, ylab= "Demanda MWh")
+```

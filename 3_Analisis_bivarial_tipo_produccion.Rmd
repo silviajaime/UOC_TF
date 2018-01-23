@@ -1,0 +1,98 @@
+---
+title: "Relacion precio medio (PM) y tipo de produccion"
+output:
+  html_document: default
+  html_notebook: default
+---
+
+#3. Analisis bivarial precio medio y tipo de produccion
+#Nota: los resultados corresponden al apartado 2.5
+
+#3.1.Analisis correlaciones precio - produccion
+
+```{r}
+#Analisis de correlaciones entre la variable precio medio y el tipo de produccion
+t3<-electricity_prices[,c("PM", "eol", "nuc", "hid", "cco", "sol")]
+#Eliminamos observaciones sin datos (NAs)
+t3.na<-t3[!is.na(t3$hid),]
+t3.na<-t3.na[!is.na(t3.na$sol),]
+cort3<-cor(t3.na)
+round(cort3,4)
+```
+La correlacion mas alta se encuentra entre PM, produccion eolica (-0.4985) y produccion hidraulica (-0.3463), negativa en ambos casos. Por lo tanto este tipo de produccion contribuye a la disminucion del precio.
+
+```{r}
+#Analisis precio- energia hidraulica
+plot(electricity_prices$hid, PM, xlab="produccion hidraulica MWh", ylab="precio medio")
+```
+```{r}
+#Analisis precio- solar
+plot(electricity_prices$sol, PM, xlab="produccion solar MWh", ylab="precio medio")
+```
+```{r}
+#Analisis precio- energia hidraulica
+plot(electricity_prices$cco, PM, xlab="produccion cco", ylab="precio medio")
+```
+```{r}
+#Analisis precio- energia eolica
+plot(electricity_prices$eol, PM, xlab="produccion eolica", ylab="precio medio")
+```
+
+Es evidente que existe una relacion entre las variables de produccion y el precio pero esta relacion no es linear. La variable con relacion mas linear es la produccion eolica, tambien se observa cierta linearidad con la produccion total.
+
+#3.1.1 Regresion precio energia eolica
+
+```{r}
+#Analisis relacion PM - produccion eolica
+plot(t3.na$eol, t3.na$PM)
+```
+
+```{r}
+#Realizamos regresion y comprobamos la normalidad
+eol_p.lm = lm(t3.na$PM ~ t3.na$eol  , data=t3.na) 
+eol_p.lm 
+eol_p.stdres = rstandard(eol_p.lm)
+qqnorm(eol_p.stdres, 
+       ylab="Standardized Residuals", 
+       xlab="Normal Scores", 
+       main="Precio - Demanda") 
+qqline(eol_p.stdres)
+```
+```{r}
+summary(eol_p.lm)
+```
+El valor de R-squared es muy bajo (0.2485), lo que demuestra la poca relacion lineal entre las variables.
+
+```{r}
+#A??adimos la linea de regresion al grafico
+R_squared<-0.2485
+plot(t3.na$eol, t3.na$PM, xlab = "produccion eolica MWh", ylab = "precio medio")
+abline(lm(t3.na$PM ~ t3.na$eol), col= "red")
+text(15000, 80, labels = "R_squared = 0.2485", col = "red")
+```
+
+
+#3.1.Analisis correlaciones demanda - produccion
+```{r}
+#Analisis de correlaciones entre la variable demanda y la produccion
+t4<-electricity_prices[,c("dem", "eol", "nuc", "hid", "cco", "sol")]
+#Eliminamos observaciones sin datos (NAs)
+t4.na<-t4[!is.na(t4$hid),]
+t4.na<-t4.na[!is.na(t4.na$sol),]
+cor(t4.na)
+```
+
+Observamos que no existen correlaciones significativas entre la demanda y el tipo de produccion, lo que hace pensar que la demanda no afecta al tipo de produccion (es decir, no parecen utilizarse fuentes concretas para cubrir los picos en la demanda). La correlacion mas elevada es entre demanda y produccion solar (0.396).
+
+
+```{r}
+#Analisis relacion demanda produccion solar
+plot(t4.na$sol, t4.na$dem, ylab= "Demanda MWh", xlab="Produccion solar MWh")
+```
+
+```{r}
+#Realizamos regresion 
+sol_d.lm = lm(t4.na$dem ~ t4.na$sol  , data=t4.na) 
+summary(sol_d.lm)
+```
+El valore de R-squared (0.16) es  muy bajo, por lo tanto esta linea no explica gran parte de la varianza.
